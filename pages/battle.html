@@ -172,28 +172,65 @@
     position: relative;
     z-index: 1;
     transition: filter 0.1s;
-    animation: idle-bob 1.8s ease-in-out infinite;
   }
-  .fighter-platform.player2 img { animation-delay: -0.9s; } /* out of sync with player1 */
+  .fighter-platform.player2 img { transform: scaleX(-1); } /* face player1 */
 
-  @keyframes idle-bob {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
+  @keyframes idleBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  @keyframes idleBobF { 0%,100% { transform: scaleX(-1) translateY(0); } 50% { transform: scaleX(-1) translateY(-6px); } }
+  @keyframes lunge {
+    0% { transform: translateX(0) scaleY(1); }
+    18% { transform: translateX(0) scaleY(1.12); }
+    45%,68% { transform: translateX(46px) scaleY(0.9); }
+    100% { transform: translateX(0) scaleY(1); }
+  }
+  @keyframes lungeF {
+    0% { transform: scaleX(-1) translateX(0) scaleY(1); }
+    18% { transform: scaleX(-1) translateX(0) scaleY(1.12); }
+    45%,68% { transform: scaleX(-1) translateX(46px) scaleY(0.9); }
+    100% { transform: scaleX(-1) translateX(0) scaleY(1); }
+  }
+  @keyframes hitAnim {
+    0% { transform: translateX(0); filter: brightness(1); }
+    15% { transform: translateX(-14px); filter: brightness(5) drop-shadow(0 0 16px #fff); }
+    45% { transform: translateX(-14px); filter: brightness(2); }
+    100% { transform: translateX(0); filter: brightness(1); }
+  }
+  @keyframes hitAnimF {
+    0% { transform: scaleX(-1) translateX(0); filter: brightness(1); }
+    15% { transform: scaleX(-1) translateX(-14px); filter: brightness(5) drop-shadow(0 0 16px #fff); }
+    45% { transform: scaleX(-1) translateX(-14px); filter: brightness(2); }
+    100% { transform: scaleX(-1) translateX(0); filter: brightness(1); }
+  }
+  @keyframes winAnim { 0%,100% { transform: translateY(0); } 30%,55% { transform: translateY(-18px); } }
+  @keyframes winAnimF { 0%,100% { transform: scaleX(-1) translateY(0); } 30%,55% { transform: scaleX(-1) translateY(-18px); } }
+  @keyframes loseAnim { 0% { transform: translateX(0) rotate(0); opacity: 1; } 100% { transform: translateX(10px) rotate(14deg) translateY(6px); opacity: 0.35; } }
+  @keyframes loseAnimF { 0% { transform: scaleX(-1) translateX(0) rotate(0); opacity: 1; } 100% { transform: scaleX(-1) translateX(10px) rotate(14deg) translateY(6px); opacity: 0.35; } }
+
+  .fighter-platform.player1.s-idle img { animation: idleBob 0.9s ease-in-out infinite; }
+  .fighter-platform.player2.s-idle img { animation: idleBobF 0.9s ease-in-out infinite; }
+  .fighter-platform.player1.s-attack img { animation: lunge 0.55s ease-in-out forwards !important; }
+  .fighter-platform.player2.s-attack img { animation: lungeF 0.55s ease-in-out forwards !important; }
+  .fighter-platform.player1.s-hit img { animation: hitAnim 0.45s ease-out forwards !important; }
+  .fighter-platform.player2.s-hit img { animation: hitAnimF 0.45s ease-out forwards !important; }
+  .fighter-platform.player1.s-win img { animation: winAnim 0.7s ease-in-out 3 !important; }
+  .fighter-platform.player2.s-win img { animation: winAnimF 0.7s ease-in-out 3 !important; }
+  .fighter-platform.player1.s-lose img { animation: loseAnim 0.7s ease-out forwards !important; }
+  .fighter-platform.player2.s-lose img { animation: loseAnimF 0.7s ease-out forwards !important; }
+
+  #arena.shaking { animation: arenaShake 0.28s ease-out; }
+  @keyframes arenaShake {
+    0%,100% { transform: translate(0,0); }
+    20% { transform: translate(-5px,2px); }
+    40% { transform: translate(5px,-2px); }
+    60% { transform: translate(-3px,1px); }
+    80% { transform: translate(3px,-1px); }
   }
 
-  .fighter-platform.shake { animation: shake 0.35s ease; }
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    20% { transform: translateX(-6px); }
-    40% { transform: translateX(6px); }
-    60% { transform: translateX(-4px); }
-    80% { transform: translateX(4px); }
-  }
-  .fighter-platform.flash-hit img { filter: brightness(3) saturate(0); }
+  #fx-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 
   @media (prefers-reduced-motion: reduce) {
-    .fighter-platform.shake { animation: none; }
-    .fighter-platform img { animation: none; }
+    .fighter-platform img { animation: none !important; }
+    #arena.shaking { animation: none; }
   }
 
   /* ===================== PHASE BANNER ===================== */
@@ -396,6 +433,7 @@
     <div class="fighter-platform player2" id="slot-player2">
       <img id="sprite-player2" src="" alt="">
     </div>
+    <canvas id="fx-canvas"></canvas>
   </div>
 
   <div id="phase-banner" class="neutral">Loading battle...</div>
@@ -447,9 +485,9 @@
 <script src="../js/questions.js"></script>
 
 <script>
-const QUESTION_TIME = 20;
-const STEAL_TIME = 15;
-const TURN_TRANSITION_DELAY = 1000; // pause so you can actually see the hit/log before handoff
+const QUESTION_TIME = 15;
+const STEAL_TIME = 5;
+const TURN_TRANSITION_DELAY = 2200; // pause so the attack animation + log are visible before handoff
 
 const TYPE_ICONS = { fire: '\u{1F525}', water: '\u{1F4A7}', electric: '\u{26A1}', normal: '\u{1F44A}' };
 
@@ -467,8 +505,8 @@ function loadPlayerFromStorage(key) {
     name: saved.name,
     sprite: saved.sprite,
     photo: saved.photo,
-    hp: 500,
-    maxHP: 500,
+    hp: 200,
+    maxHP: 200,
     streak: 0,
     critPending: false,
     storedBonus: 0,
@@ -544,12 +582,118 @@ function renderFighter(playerKey) {
   updateStreakDisplay(playerKey);
   renderBonusBadge(playerKey);
 }
-function renderAll() { renderFighter('player1'); renderFighter('player2'); }
+function renderAll() {
+  renderFighter('player1');
+  renderFighter('player2');
+  setFighterState('player1', 'idle');
+  setFighterState('player2', 'idle');
+}
 
-function flashHit(playerKey) {
-  const slot = document.getElementById('slot-' + playerKey);
-  slot.classList.add('shake', 'flash-hit');
-  setTimeout(() => slot.classList.remove('shake', 'flash-hit'), 350);
+// ---------------------------------------------------------------------
+// 3b. Animation system (attack lunge / projectile / hit / win / lose)
+// Adapted from the girl-vs-guy.html demo's mirrored keyframe technique.
+// ⚠️ Only 'fire' has a real sprite-sheet projectile (reused from the demo).
+// water/electric/normal use a plain colored orb via getTypeColour() as a
+// placeholder until dedicated sprite sheets exist for those types.
+// ---------------------------------------------------------------------
+// ⚠️ IMPORTANT: save the fireball sprite sheet from your girl-vs-guy.html demo
+// as a real file at this path. I'''m intentionally NOT hand-transcribing your
+// ~40KB base64 string here -- a single mistyped character silently corrupts
+// a base64 image with no error, and I can'''t verify pixel-perfect fidelity
+// without executing it. If the file is missing, this automatically falls
+// back to the colored-orb placeholder below instead of breaking.
+const fbImg = new Image();
+fbImg.src = '../assets/fx-fireball.png';
+function fireballReady() { return fbImg.complete && fbImg.naturalWidth > 0; }
+
+function setFighterState(playerKey, state) {
+  const el = document.getElementById('slot-' + playerKey);
+  el.classList.remove('s-idle', 's-attack', 's-hit', 's-win', 's-lose');
+  void el.offsetWidth; // force reflow so animations restart cleanly
+  el.classList.add('s-' + state);
+}
+
+function arenaShake() {
+  const arena = document.getElementById('arena');
+  arena.classList.add('shaking');
+  setTimeout(() => arena.classList.remove('shaking'), 290);
+}
+
+function spriteCenter(playerKey) {
+  const img = document.getElementById('sprite-' + playerKey);
+  const arena = document.getElementById('arena');
+  const r = img.getBoundingClientRect();
+  const a = arena.getBoundingClientRect();
+  return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 };
+}
+
+// Fires a projectile from attackerKey toward defenderKey, then calls cb.
+function playProjectile(attackerKey, defenderKey, moveType, cb) {
+  const arena = document.getElementById('arena');
+  const canvas = document.getElementById('fx-canvas');
+  canvas.width = arena.clientWidth;
+  canvas.height = arena.clientHeight;
+  const ctx = canvas.getContext('2d');
+  const from = spriteCenter(attackerKey);
+  const to = spriteCenter(defenderKey);
+  const fromLeft = from.x < to.x;
+  const frames = 7;
+  let frame = 0;
+  const color = getTypeColour(moveType);
+
+  const iv = setInterval(() => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const prog = frame / frames;
+    const x = from.x + (to.x - from.x) * prog;
+    const y = from.y + (to.y - from.y) * prog;
+
+    if (moveType === 'fire' && fireballReady()) {
+      const FW = 767 / 2, FH = 325 / 2, SC = 0.35, dw = FW * SC, dh = FH * SC;
+      const col = frame % 2, row = Math.floor(frame / 2) % 2;
+      ctx.save();
+      if (!fromLeft) { ctx.scale(-1, 1); ctx.translate(-canvas.width, 0); }
+      const dx = fromLeft ? x - dw / 2 : canvas.width - x - dw / 2;
+      ctx.drawImage(fbImg, col * FW, row * FH, FW, FH, dx, y - dh / 2, dw, dh);
+      ctx.restore();
+    } else {
+      // Placeholder for water/electric/normal until real sprite sheets exist
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 14;
+      ctx.fill();
+    }
+
+    frame++;
+    if (frame > frames) {
+      clearInterval(iv);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (cb) cb();
+    }
+  }, 60);
+}
+
+// Full sequence: attacker lunges -> projectile travels -> defender reacts.
+// Returns via cb once the hit reaction has played (or immediately on miss).
+function playAttackSequence(attackerKey, defenderKey, moveType, hit, cb) {
+  setFighterState(attackerKey, 'attack');
+  setTimeout(() => {
+    if (!hit) {
+      setFighterState(attackerKey, 'idle');
+      if (cb) cb();
+      return;
+    }
+    playProjectile(attackerKey, defenderKey, moveType, () => {
+      arenaShake();
+      setFighterState(defenderKey, 'hit');
+      setTimeout(() => {
+        setFighterState(attackerKey, 'idle');
+        setFighterState(defenderKey, 'idle');
+        if (cb) cb();
+      }, 450);
+    });
+  }, 550); // matches the lunge keyframe duration
 }
 
 function setBanner(text, tone) {
@@ -571,20 +715,31 @@ function setQuestionWaiting(msg) {
 const machine = new BattleStateMachine(battleState, {
   onStateChange: handleStateChange,
   onDamageDealt: (attackerKey, defenderKey, dmg, isCrit, bonusApplied) => {
-    renderAll();
-    flashHit(defenderKey);
-    let msg = `${battleState[attackerKey].name} dealt ${dmg} damage!`;
-    if (isCrit) msg += ' CRITICAL HIT!';
-    if (bonusApplied > 0) msg += ` (+${Math.round(bonusApplied * 100)}% steal bonus)`;
-    logEvent(msg);
-    setBanner(msg, isCrit ? 'warn' : 'neutral');
+    playAttackSequence(attackerKey, defenderKey, currentAttackMoveType, true, () => {
+      renderAll();
+      let msg = `${battleState[attackerKey].name} dealt ${dmg} damage!`;
+      if (isCrit) msg += ' CRITICAL HIT!';
+      if (bonusApplied > 0) msg += ` (+${Math.round(bonusApplied * 100)}% steal bonus)`;
+      logEvent(msg);
+      setBanner(msg, isCrit ? 'warn' : 'neutral');
+    });
   },
   onMiss: (attackerKey) => {
-    const msg = `${battleState[attackerKey].name}'s attack missed!`;
-    logEvent(msg);
-    setBanner(msg, 'warn');
+    const defenderKey = otherKey(attackerKey);
+    playAttackSequence(attackerKey, defenderKey, currentAttackMoveType, false, () => {
+      const msg = `${battleState[attackerKey].name}'s attack missed!`;
+      logEvent(msg);
+      setBanner(msg, 'warn');
+    });
   },
-  onBattleEnd: (winnerKey) => { renderAll(); showVictoryScreen(winnerKey); }
+  onBattleEnd: (winnerKey) => {
+    renderAll();
+    if (winnerKey) {
+      setFighterState(winnerKey, 'win');
+      setFighterState(otherKey(winnerKey), 'lose');
+    }
+    showVictoryScreen(winnerKey);
+  }
 });
 
 let activeTimer = null;
@@ -649,6 +804,7 @@ function renderMoveSelect(playerKey, isStealAttack) {
     `;
     row.onclick = () => {
       if (isStealAttack) {
+        currentAttackMoveType = move.type;
         machine.stealerSelectMove(move);
       } else {
         machine.selectMove(move);
@@ -664,6 +820,7 @@ function renderMoveSelect(playerKey, isStealAttack) {
 // 7. Question panel
 // ---------------------------------------------------------------------
 const ANSWER_LABELS = ['A', 'B', 'C', 'D'];
+let currentAttackMoveType = 'normal'; // set right before any machine call that may trigger onDamageDealt/onMiss
 
 function renderQuestion(move, answeringKey) {
   setBanner(`${battleState[answeringKey].name} — answer to attack!`, 'neutral');
@@ -688,6 +845,7 @@ function renderQuestion(move, answeringKey) {
         const correct = i === correctIndex;
         btn.classList.add(correct ? 'correct' : 'wrong');
         setBanner(correct ? 'CORRECT!' : 'WRONG!', correct ? 'neutral' : 'warn');
+        currentAttackMoveType = move.type;
         setTimeout(() => machine.resolveQuestion(correct, false), 500);
       };
       list.appendChild(btn);

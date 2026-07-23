@@ -571,91 +571,81 @@ function wait(ms) {
 
     // ── Handle the continue button ───────────────────────────────────
   async function handleContinue() {
-      const name = document.getElementById('nameInput').value.trim()
-       const btn  = document.getElementById('continueBtn')
+  const name = document.getElementById('nameInput').value.trim()
+  const btn = document.getElementById('continueBtn')
 
-       const tempUrl = await generateSprite(selectedImageBase64)
+  // Validate — photo first
+  if (!selectedImageBase64) {
+    showStatus('Please upload a photo first.', 'error')
+    return
+  }
+
+  // Validate — name required
+  if (!name) {
+    showStatus('Please enter your fighter name.', 'error')
+    return
+  }
+
+  // Disable button so they can't click twice
+  btn.disabled = true
+  btn.textContent = 'Generating...'
+
+  try {
+    let spriteUrl
+
+    // Check if this player already has a sprite AND the photo hasn't changed
+    const existingPlayer = JSON.parse(localStorage.getItem(getCurrentPlayerKey()))
+    const photoChanged = !existingPlayer || existingPlayer.photo !== selectedImageBase64
+
+    if (!photoChanged && existingPlayer.sprite) {
+      // Reuse the existing sprite — it was already background-processed
+      // last time, so skip removeWhiteBackground here too.
+      console.log('Photo unchanged — reusing existing sprite')
+      spriteUrl = existingPlayer.sprite
+      showStatus('Using existing sprite...', 'info')
+      await wait(2000)
+    } else {
+      const tempUrl = await generateSprite(selectedImageBase64)
       showStatus('Saving sprite...', 'info')
       spriteUrl = await urlToBase64(tempUrl)
       showStatus('Removing background...', 'info')
-        spriteUrl = await removeWhiteBackground(spriteUrl) 
-        
-      // Validate — photo first
-      if (!selectedImageBase64) {
-        showStatus('Please upload a photo first.', 'error')
-        return
+      spriteUrl = await removeWhiteBackground(spriteUrl)   // ADDED — was missing here
+    }
+
+    console.log('Sprite URL:', spriteUrl)
+
+    // save to localStorage
+    const playerKey = getCurrentPlayerKey()
+
+    const player = {
+      name: name,
+      photo: selectedImageBase64,
+      sprite: spriteUrl,
+      moves: [],
+      hp: 200,
+      maxHP: 200,
+      streak: 0,
+      critPending: false,
+      storedBonus: 0
+    }
+
+    localStorage.setItem(playerKey, JSON.stringify(player))
+    localStorage.removeItem('editingPlayer')
+
+    showStatus('Character created!', 'success')
+    btn.textContent = 'Done!'
+
+    showSpritePreview(spriteUrl, name)
+    showStatus('Saved! Moving to next step...', 'success')
+
+    setTimeout(() => {
+      if (playerKey === 'player1') {
+        showHandoff()
+      } else {
+        window.location.href = 'pages/catalogue.html'
       }
-
-      // Validate — name required
-      if (!name) {
-        showStatus('Please enter your fighter name.', 'error')
-        return
-      }
-
-        // Disable button so they can't click twice
-        btn.disabled = true
-btn.textContent = 'Generating...'
-
-try {
-  let spriteUrl
-
-  // Check if this player already has a sprite AND the photo hasn't changed
-  const existingPlayer = JSON.parse(localStorage.getItem(getCurrentPlayerKey()))
-  const photoChanged = !existingPlayer || existingPlayer.photo !== selectedImageBase64
-
-  if (!photoChanged && existingPlayer.sprite) {
-    // Reuse the existing sprite — no API call needed
-    console.log('Photo unchanged — reusing existing sprite')
-    spriteUrl = existingPlayer.sprite
-    showStatus('Using existing sprite...', 'info')
-    await wait(2000)   // small delay so it doesn't feel instant
-  } else {
-    // save the actual image data as base64 — which lives in localStorage permanently and never expires.
-    const tempUrl = await generateSprite(selectedImageBase64)
-showStatus('Saving sprite...', 'info')
-spriteUrl = await urlToBase64(tempUrl)
-  }
-
-  console.log('Sprite URL:', spriteUrl)
-
-      // save to localStorage
-      const playerKey = getCurrentPlayerKey()   // 'player1' or 'player2'
-
-      const player = {
-        name: name,
-        photo: selectedImageBase64,    // original photo for sending to AI
-        sprite: spriteUrl,                 
-        moves: [],
-        hp: 200,
-        maxHP: 200,
-        streak: 0,
-        critPending: false,
-        storedBonus: 0
-      }
-
-      localStorage.setItem(playerKey, JSON.stringify(player))
-      localStorage.removeItem('editingPlayer')
-
-          showStatus('Character created!', 'success')
-           btn.textContent = 'Done!'
-
-          // Show the generated sprite briefly before navigating
-          showSpritePreview(spriteUrl, name)
-
-      showStatus('Saved! Moving to next step...', 'success')
-
-      // Navigate after a short delay
-      setTimeout(() => {
-        // Check if player 1 is done — if so, set up player 2
-        if (playerKey === 'player1') {
-          showHandoff()
-        } else {
-          // Both players done — go to catalogue
-          window.location.href = 'pages/catalogue.html'
-        }
-      }, 2500)
-    }catch (error){
-       // Something went wrong — show error, re-enable button
+    }, 2500)
+  } catch (error) {
     console.error(error)
     showStatus('Generation failed: ' + error.message + ' — try again', 'error')
     btn.disabled = false
