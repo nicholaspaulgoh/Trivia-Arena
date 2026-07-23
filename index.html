@@ -425,8 +425,6 @@ async function generateSprite(base64Photo) {
   showStatus('Compressing image...', 'info')
   const compressed = await compressImage(base64Photo)
 
-  // Replicate needs the base64 WITHOUT the "data:image/jpeg;base64," prefix
-  // It only wants the raw base64 data
   const base64Data = compressed.split(',')[1]
 
   // Step 2 — send to Replicate to start the prediction
@@ -441,14 +439,10 @@ async function generateSprite(base64Photo) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        version: 'retro-diffusion/rd-fast',
         input: {
-          prompt: 'portrait game character sprite, facing forward, Street Fighter style',
-          style: 'portrait',
-          width: 128,
-          height: 128,
-          remove_bg: true,
-          image: `data:image/jpeg;base64,${base64Data}`
+          prompt: 'pixel art RPG character, anime-inspired fighter, battle stance, 16-bit video game character sprite, side view combat stance, flat solid colors, sharp chunky pixels, black outlines, full body, plain white background',
+          image_input: [`data:image/jpeg;base64,${base64Data}`],
+          output_format: 'png'
         }
       })
     })
@@ -464,13 +458,6 @@ async function generateSprite(base64Photo) {
 
   } catch (error) {
     throw new Error('Could not connect to AI: ' + error.message)
-
-    // Optional: use placeholder and continue anyway during development
-    // Uncomment these lines if you want to skip the AI and test the rest of the game:
-    // const player = { name, photo: selectedImageBase64, sprite: 'images/placeholder-sprite.jpg', ... }
-    // localStorage.setItem(playerKey, JSON.stringify(player))
-    // showHandoff()
-
   }
 
   // Step 3 — poll until the result is ready
@@ -498,10 +485,12 @@ async function pollForResult(predictionId) {
       const result = await response.json()
       console.log('Poll attempt', attempts, '— status:', result.status)
 
-      if (result.status === 'succeeded') {
-        // result.output is an array — the image URL is the first item
-        return result.output[0]
-      }
+if (result.status === 'succeeded') {
+  // nano-banana returns output as a single string; some other models
+  // return an array — handle both so this doesn't silently break again
+  // if you ever switch models.
+  return Array.isArray(result.output) ? result.output[0] : result.output
+}
 
       if (result.status === 'failed') {
         throw new Error('AI generation failed: ' + result.error)
@@ -521,6 +510,49 @@ async function pollForResult(predictionId) {
   throw new Error('Timed out — AI took too long to respond')
 }
 
+function removeWhiteBackground(base64ImageUrl) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0)
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const data = imageData.data
+      const width = canvas.width, height = canvas.height
+      const threshold = 235 // how close to pure white counts as "background"
+      const visited = new Uint8Array(width * height)
+      const stack = []
+
+      const idx = (x, y) => y * width + x
+      const isWhiteish = (i) => data[i*4] > threshold && data[i*4+1] > threshold && data[i*4+2] > threshold
+
+      // Seed the flood-fill from every edge pixel — only background
+      // touching the border gets removed, not white pixels inside the sprite
+      for (let x = 0; x < width; x++) { stack.push([x, 0]); stack.push([x, height - 1]) }
+      for (let y = 0; y < height; y++) { stack.push([0, y]); stack.push([width - 1, y]) }
+
+      while (stack.length) {
+        const [x, y] = stack.pop()
+        if (x < 0 || y < 0 || x >= width || y >= height) continue
+        const i = idx(x, y)
+        if (visited[i]) continue
+        visited[i] = 1
+        if (!isWhiteish(i)) continue
+        data[i * 4 + 3] = 0 // make transparent
+        stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1])
+      }
+
+      ctx.putImageData(imageData, 0, 0)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.src = base64ImageUrl
+  })
+}
+
 async function urlToBase64(url) {
   const response = await fetch(url)
   const blob = await response.blob()
@@ -538,10 +570,16 @@ function wait(ms) {
 }
 
     // ── Handle the continue button ───────────────────────────────────
-    async function handleContinue() {
+  async function handleContinue() {
       const name = document.getElementById('nameInput').value.trim()
        const btn  = document.getElementById('continueBtn')
 
+       const tempUrl = await generateSprite(selectedImageBase64)
+      showStatus('Saving sprite...', 'info')
+      spriteUrl = await urlToBase64(tempUrl)
+      showStatus('Removing background...', 'info')
+        spriteUrl = await removeWhiteBackground(spriteUrl) 
+        
       // Validate — photo first
       if (!selectedImageBase64) {
         showStatus('Please upload a photo first.', 'error')

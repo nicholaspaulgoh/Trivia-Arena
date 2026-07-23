@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Steal Mechanic Test</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a1a2e;
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      gap: 16px;
+    }
+    h1 { font-size: 14px; color: #534AB7; letter-spacing: 2px; }
+
+    /* ── Fighter cards ── */
+    .fighters {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      width: 100%;
+      max-width: 600px;
+    }
+    .fighter-card {
+      background: #16213e;
+      border: 2px solid #333;
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .fighter-card.active { border-color:#534AB7; box-shadow:0 0 16px rgba(83,74,183,0.2); }
+    .fighter-name { font-size:13px; font-weight:bold; display:flex; align-items:center; gap:8px; }
+    .turn-pill {
+      font-size:9px; padding:2px 7px; border-radius:20px;
+      background:#534AB7; color:white; display:none;
+    }
+    .turn-pill.show { display:inline-block; }
+    .hp-track { height:8px; background:#333; border-radius:4px; overflow:hidden; }
+    .hp-fill  { height:100%; background:#1D9E75; border-radius:4px; transition:width 0.4s,background 0.3s; }
+    .hp-text  { font-size:11px; color:#888; }
+    .streak-row { display:flex; align-items:center; gap:7px; font-size:11px; }
+    .pips { display:flex; gap:4px; }
+    .pip {
+      width:12px; height:12px; border-radius:50%;
+      border:2px solid #333; background:transparent; transition:all 0.2s;
+    }
+    .pip.on { background:#534AB7; border-color:#534AB7; box-shadow:0 0 5px rgba(83,74,183,0.6); }
+    .pip.warn { background:#BA7517; border-color:#BA7517; animation:pp 0.6s ease-in-out infinite; }
+    @keyframes pp { 0%,100%{transform:scale(1)} 50%{transform:scale(1.3)} }
+    .crit-pill {
+      font-size:9px; padding:2px 7px; border-radius:20px;
+      background:#E24B4A; color:white; display:none;
+      animation:cf 0.5s ease-in-out infinite alternate;
+    }
+    @keyframes cf { from{opacity:1} to{opacity:0.6} }
+    .crit-pill.show { display:inline-block; }
+    .bonus-pill {
+      font-size:10px; padding:2px 8px; border-radius:20px;
+      background:#BA751722; color:#BA7517; border:1px solid #BA7517;
+      display:none;
+    }
+    .bonus-pill.visible { display:inline-block; }
+
+    /* ── Question overlay ── */
+    .q-overlay {
+      width:100%; max-width:600px;
+      display:none; flex-direction:column; gap:12px;
+      background:#0e0e2a; border:2px solid #534AB7;
+      border-radius:14px; padding:18px;
+    }
+    .q-overlay.visible { display:flex; }
+    @keyframes su { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .q-overlay.visible { animation:su 0.2s ease-out; }
+
+    .q-header { display:flex; justify-content:space-between; align-items:center; }
+    .q-type-label {
+      font-size:11px; font-weight:bold;
+      padding:3px 10px; border-radius:20px;
+      letter-spacing:1px;
+    }
+    .label-answer { background:#534AB733; color:#8880FF; border:1px solid #534AB7; }
+    .label-steal  { background:#BA751733; color:#FFD700; border:1px solid #BA7517; }
+    .timer-num { font-size:20px; font-weight:bold; transition:color 0.3s; }
+    .timer-num.red { color:#E24B4A; }
+    .countdown-track { height:7px; background:#222; border-radius:4px; overflow:hidden; }
+    .countdown-fill {
+      height:100%; border-radius:4px; transition:background 0.3s;
+    }
+    .fill-answer { background:#1D9E75; }
+    .fill-steal  { background:#BA7517; }
+    .fill-urgent { background:#E24B4A; }
+    .phase-lbl { font-size:11px; color:#888; text-align:center; }
+    .phase-lbl.steal-lbl { color:#FFD700; font-weight:bold; }
+    .q-text { font-size:15px; line-height:1.6; text-align:center; color:white; }
+    .options { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .opt {
+      padding:11px 9px; background:#1a1a3a;
+      border:2px solid #333; border-radius:9px;
+      color:white; font-size:12px; text-align:left;
+      cursor:pointer; transition:background 0.15s,border-color 0.15s;
+      line-height:1.4;
+    }
+    .opt:hover:not(:disabled) { background:#222255; border-color:#534AB7; }
+    .opt.correct { background:#0d3d28; border-color:#1D9E75; color:#1D9E75; }
+    .opt.wrong   { background:#3d0d0d; border-color:#E24B4A; color:#E24B4A; }
+    .opt:disabled { cursor:not-allowed; }
+    @keyframes sh { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+    .opt.shake { animation:sh 0.35s ease-out; }
+    .result-msg { text-align:center; font-size:13px; font-weight:bold; min-height:18px; }
+    .result-msg.correct { color:#1D9E75; }
+    .result-msg.wrong   { color:#E24B4A; }
+    .result-msg.steal   { color:#FFD700; }
+    .result-msg.timeout { color:#888; }
+
+    /* ── Controls ── */
+    .controls {
+      width:100%; max-width:600px;
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .ctrl-lbl { font-size:10px; color:#555; letter-spacing:1px; text-transform:uppercase; }
+    .btn-row { display:flex; gap:8px; flex-wrap:wrap; }
+    .btn {
+      padding:8px 14px; border:2px solid; border-radius:8px;
+      font-size:12px; font-weight:bold;
+      cursor:pointer; background:transparent;
+      transition:transform 0.1s, filter 0.1s;
+    }
+    .btn:hover { filter:brightness(1.3); }
+    .btn:active { transform:scale(0.95); }
+    .c-fire     { border-color:#E85D24; color:#E85D24; }
+    .c-water    { border-color:#4488ff; color:#4488ff; }
+    .c-elec     { border-color:#FFD700; color:#FFD700; }
+    .c-norm     { border-color:#888;    color:#888;    }
+    .c-switch   { border-color:#534AB7; color:#534AB7; }
+    .c-reset    { border-color:#333;    color:#555;    font-size:11px; }
+
+    /* ── Event log ── */
+    .log-box {
+      width:100%; max-width:600px;
+      background:#16213e; border:1px solid #333; border-radius:10px;
+      padding:12px; height:110px; overflow-y:auto;
+      display:flex; flex-direction:column; gap:3px;
+    }
+    .log-entry { font-size:11px; padding:2px 0; border-bottom:1px solid #1a1a2e; }
+    .log-entry.correct { color:#1D9E75; }
+    .log-entry.wrong   { color:#E24B4A; }
+    .log-entry.crit    { color:#FFD700; font-weight:bold; }
+    .log-entry.steal   { color:#BA7517; }
+    .log-entry.damage  { color:#cc88ff; }
+    .log-entry.system  { color:#555; }
+
+    @keyframes dmg { 0%{background:rgba(229,75,74,0.35)} 100%{background:transparent} }
+    .fighter-card.hit { animation:dmg 0.4s ease-out; }
+    @keyframes crit { 0%{background:rgba(255,215,0,0.28)} 100%{background:transparent} }
+    .fighter-card.crit-hit { animation:crit 0.45s ease-out; }
+  </style>
+</head>
+<body>
+
+<h1>⚡ STEAL MECHANIC TEST</h1>
+
+<!-- Fighter cards -->
+<div class="fighters">
+  <!-- Player 1 -->
+  <div class="fighter-card active" id="card-player1">
+    <div class="fighter-name">
+      Player 1
+      <span class="turn-pill show" id="turn-player1">TURN</span>
+    </div>
+    <div class="hp-track"><div class="hp-fill" id="hp-player1" style="width:100%"></div></div>
+    <div class="hp-text" id="hptext-player1">200 / 200</div>
+    <div class="streak-row">
+      <span style="color:#888;min-width:46px">Streak</span>
+      <div class="pips">
+        <div class="pip" id="pip-player1-0"></div>
+        <div class="pip" id="pip-player1-1"></div>
+        <div class="pip" id="pip-player1-2"></div>
+      </div>
+      <span class="crit-pill" id="crit-player1">⚡CRIT</span>
+    </div>
+    <div><span class="bonus-pill" id="bonus-player1">+10% bonus</span></div>
+  </div>
+
+  <!-- Player 2 -->
+  <div class="fighter-card" id="card-player2">
+    <div class="fighter-name">
+      Player 2
+      <span class="turn-pill" id="turn-player2">TURN</span>
+    </div>
+    <div class="hp-track"><div class="hp-fill" id="hp-player2" style="width:100%"></div></div>
+    <div class="hp-text" id="hptext-player2">200 / 200</div>
+    <div class="streak-row">
+      <span style="color:#888;min-width:46px">Streak</span>
+      <div class="pips">
+        <div class="pip" id="pip-player2-0"></div>
+        <div class="pip" id="pip-player2-1"></div>
+        <div class="pip" id="pip-player2-2"></div>
+      </div>
+      <span class="crit-pill" id="crit-player2">⚡CRIT</span>
+    </div>
+    <div><span class="bonus-pill" id="bonus-player2">+10% bonus</span></div>
+  </div>
+</div>
+
+<!-- Question overlay -->
+<div class="q-overlay" id="qOverlay">
+  <div class="q-header">
+    <span class="q-type-label label-answer" id="qTypeLabel">⚡ QUESTION</span>
+    <span class="timer-num" id="timerNum">15</span>
+  </div>
+  <div class="countdown-track">
+    <div class="countdown-fill fill-answer" id="cFill" style="width:100%"></div>
+  </div>
+  <div class="phase-lbl" id="phaseLbl">Answer within 15 seconds</div>
+  <div class="q-text" id="qText">Loading...</div>
+  <div class="options" id="optGrid"></div>
+  <div class="result-msg" id="resultMsg"></div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="ctrl-lbl">Simulate active player using a move:</div>
+  <div class="btn-row">
+    <button class="btn c-fire"   onclick="startQuestion('fire')">🔥 Fire move</button>
+    <button class="btn c-water"  onclick="startQuestion('water')">💧 Water move</button>
+    <button class="btn c-elec"   onclick="startQuestion('electric')">⚡ Electric move</button>
+    <button class="btn c-norm"   onclick="startQuestion('normal')">👊 Normal move</button>
+  </div>
+  <div class="ctrl-lbl">Battle controls:</div>
+  <div class="btn-row">
+    <button class="btn c-switch" onclick="switchTurn()">↔ Switch Turn</button>
+    <button class="btn c-reset"  onclick="resetAll()">↺ Reset</button>
+  </div>
+</div>
+
+<!-- Event log -->
+<div class="log-box" id="logBox">
+  <div class="log-entry system">— Game ready — Player 1's turn —</div>
+</div>
+
+<script src="js/questions.js"></script>
+<script>
+
+// ── Battle state ──────────────────────────────────────────────
+const battleState = {
+  currentTurn: 'player1',
+  player1:{ hp:200,maxHP:200,streak:0,critPending:false,storedBonus:0 },
+  player2:{ hp:200,maxHP:200,streak:0,critPending:false,storedBonus:0 }
+}
+
+const BASE_DAMAGE = 35
+
+// ── Turn tracking ─────────────────────────────────────────────
+let activeTurn   = 'player1'
+let stealingTurn = 'player2'
+let currentQ     = null
+let timerIv      = null
+let phase        = 'idle'
+
+function opponent(k){ return k==='player1'?'player2':'player1' }
+
+// ── Start a question ──────────────────────────────────────────
+async function startQuestion(moveType) {
+  if(phase !== 'idle') return
+
+  activeTurn   = battleState.currentTurn
+  stealingTurn = opponent(activeTurn)
+
+  addLog('--- '+activeTurn+' uses a '+moveType+' move ---','system')
+
+  try {
+    currentQ = await getQuestion(moveType)
+  } catch(e) {
+    // Inline fallback so test page works without questions.json
+    currentQ = {
+      text: 'What does CSS stand for?',
+      options:['A: Cascading Style Sheets','B: Computer Style System','C: Creative Styling Syntax','D: Custom Sheet Style'],
+      correct:'A', category:'technology'
+    }
+  }
+
+  showQuestion(moveType)
+}
+
+// ── Show the question overlay ─────────────────────────────────
+function showQuestion(moveType) {
+  phase = 'answer'
+
+  const icons = {fire:'🔥',water:'💧',electric:'⚡',normal:'👊'}
+  document.getElementById('qTypeLabel').textContent =
+    (icons[moveType]||'❓') + ' ' + moveType.toUpperCase() + ' QUESTION'
+  document.getElementById('qTypeLabel').className = 'q-type-label label-answer'
+  document.getElementById('phaseLbl').textContent  = 'Answer within 15 seconds'
+  document.getElementById('phaseLbl').className    = 'phase-lbl'
+  document.getElementById('qText').textContent     = currentQ.text
+  document.getElementById('resultMsg').textContent = ''
+  document.getElementById('resultMsg').className   = 'result-msg'
+  document.getElementById('cFill').className       = 'countdown-fill fill-answer'
+
+  buildOptions()
+  document.getElementById('qOverlay').classList.add('visible')
+
+  startTimer(15, function(){ onTimeout() })
+}
+
+// ── Build answer buttons ──────────────────────────────────────
+function buildOptions() {
+  const grid = document.getElementById('optGrid')
+  grid.innerHTML = ''
+  currentQ.options.forEach(opt => {
+    const btn = document.createElement('button')
+    btn.className   = 'opt'
+    btn.textContent = opt
+    btn.onclick     = () => handleClick(opt.charAt(0), btn)
+    grid.appendChild(btn)
+  })
+}
+
+// ── Handle a button click ─────────────────────────────────────
+function handleClick(letter, btn) {
+  if(phase==='idle'||phase==='done') return
+  stopTimer()
+  disableOpts()
+
+  if(phase==='answer') {
+    letter===currentQ.correct ? onCorrect(btn) : onWrong(btn)
+  } else if(phase==='steal') {
+    letter===currentQ.correct ? onStealSuccess(btn) : onStealFail(btn)
+  }
+}
+
+// ── CORRECT answer by active player ──────────────────────────
+function onCorrect(btn) {
+  btn.classList.add('correct')
+
+  // Streak logic
+  const ap = battleState[activeTurn]
+  ap.streak++
+  let isCritNow = false
+
+  if(ap.streak >= 3) {
+    ap.critPending = true
+    ap.streak = 0
+    isCritNow = true
+    addLog('⚡ '+activeTurn+' streak hits 3 — CRIT READY!','crit')
+  } else {
+    addLog(activeTurn+' answered correctly! Streak: '+ap.streak,'correct')
+  }
+
+  updateStreakDisplay(activeTurn)
+
+  // Deal damage
+  const result = applyDamageModifiers(activeTurn, BASE_DAMAGE)
+  doDamage(activeTurn, stealingTurn, result)
+
+  setResult('✓ Correct! Full damage dealt.','correct')
+
+  setTimeout(()=>{ hideOverlay(); endTurn() }, 1500)
+}
+
+// ── WRONG answer / TIMEOUT by active player ───────────────────
+function onWrong(btn) {
+  if(btn) {
+    btn.classList.add('wrong','shake')
+    setTimeout(()=>btn.classList.remove('shake'),400)
+  }
+  highlightCorrect()
+
+  // Reset active player's streak
+  battleState[activeTurn].streak = 0
+  updateStreakDisplay(activeTurn)
+  addLog(activeTurn+' answered wrong — streak reset','wrong')
+
+  setResult('✗ Wrong! Steal phase starting...','wrong')
+
+  setTimeout(()=>{ enterStealPhase() }, 1500)
+}
+
+function onTimeout() {
+  disableOpts()
+  highlightCorrect()
+  battleState[activeTurn].streak = 0
+  updateStreakDisplay(activeTurn)
+  addLog(activeTurn+' timed out — streak reset','wrong')
+  setResult('⏱ Time\'s up! Steal phase...','timeout')
+  setTimeout(()=>{ enterStealPhase() }, 1500)
+}
+
+// ── Enter steal phase ─────────────────────────────────────────
+function enterStealPhase() {
+  phase = 'steal'
+
+  // Rebuild buttons (re-enable them for opponent)
+  buildOptions()
+
+  // Update overlay styling
+  document.getElementById('qTypeLabel').textContent = '🎯 STEAL OPPORTUNITY!'
+  document.getElementById('qTypeLabel').className   = 'q-type-label label-steal'
+  document.getElementById('phaseLbl').textContent   = stealingTurn+' has 5 seconds!'
+  document.getElementById('phaseLbl').className     = 'phase-lbl steal-lbl'
+  document.getElementById('cFill').className        = 'countdown-fill fill-steal'
+  document.getElementById('cFill').style.width      = '100%'
+  setResult('','')
+
+  addLog('--- Steal phase: '+stealingTurn+' can steal! ---','steal')
+
+  startTimer(5, function(){ onStealTimeout() })
+}
+
+// ── Steal SUCCESS ─────────────────────────────────────────────
+function onStealSuccess(btn) {
+  btn.classList.add('correct')
+  highlightCorrect()
+  stopTimer()
+
+  // Store +10% bonus on the stealing player
+  // Active player's streak: NOT touched
+  battleState[stealingTurn].storedBonus =
+    Math.min(battleState[stealingTurn].storedBonus + 0.10, 0.30)
+
+  addLog(stealingTurn+' steals! +10% bonus stored','steal')
+  addLog('('+activeTurn+'\'s streak unchanged)','system')
+
+  updateStreakDisplay(stealingTurn)
+  showBonusBadge(stealingTurn)
+
+  setResult('✓ Steal success! +10% bonus stored.','steal')
+
+  setTimeout(()=>{ hideOverlay(); endTurn() }, 1500)
+}
+
+// ── Steal FAIL ────────────────────────────────────────────────
+function onStealFail(btn) {
+  btn.classList.add('wrong','shake')
+  setTimeout(()=>btn.classList.remove('shake'),400)
+  highlightCorrect()
+
+  addLog('Steal failed — no damage this turn','system')
+  setResult('✗ Steal failed — no damage.','timeout')
+
+  setTimeout(()=>{ hideOverlay(); endTurn() }, 1800)
+}
+
+// ── Steal TIMEOUT ─────────────────────────────────────────────
+function onStealTimeout() {
+  disableOpts()
+  highlightCorrect()
+  addLog('Steal timed out — no damage','system')
+  setResult('⏱ Steal timed out — no damage.','timeout')
+  setTimeout(()=>{ hideOverlay(); endTurn() }, 1800)
+}
+
+// ── Apply crit + steal bonus to damage ───────────────────────
+function applyDamageModifiers(attackerKey, base) {
+  const p = battleState[attackerKey]
+  let damage = base
+  let isCrit = false
+  let bonus  = 0
+
+  if(p.critPending) {
+    damage = Math.floor(damage * 1.5)
+    p.critPending = false
+    isCrit = true
+  }
+
+  if(p.storedBonus > 0) {
+    bonus  = p.storedBonus
+    damage = Math.floor(damage * (1 + p.storedBonus))
+    p.storedBonus = 0
+    hideBonusBadge(attackerKey)
+  }
+
+  return { damage, isCrit, bonus }
+}
+
+// ── Deal damage ───────────────────────────────────────────────
+function doDamage(attackerKey, defenderKey, result) {
+  const def = battleState[defenderKey]
+  def.hp = Math.max(0, def.hp - result.damage)
+  updateHPDisplay(defenderKey)
+
+  let msg = attackerKey+' dealt '+result.damage+' damage'
+  if(result.isCrit) msg += ' (CRIT 1.5x!)'
+  if(result.bonus > 0) msg += ' (+'+Math.round(result.bonus*100)+'% bonus)'
+  addLog(msg, result.isCrit ? 'crit' : 'damage')
+
+  flashCard(defenderKey, result.isCrit ? 'crit-hit' : 'hit')
+
+  if(def.hp <= 0) addLog('K.O.! '+attackerKey+' wins!','crit')
+}
+
+// ── End turn — switch automatically ──────────────────────────
+function endTurn() {
+  battleState.currentTurn = opponent(battleState.currentTurn)
+  addLog('--- Turn switches to '+battleState.currentTurn+' ---','system')
+  updateTurnDisplay()
+}
+
+// ── Timer ─────────────────────────────────────────────────────
+function startTimer(secs, onExpire) {
+  stopTimer()
+  const totalMs = secs * 1000
+  const start   = Date.now()
+  const fill    = document.getElementById('cFill')
+  const num     = document.getElementById('timerNum')
+  num.classList.remove('red')
+  num.textContent = secs
+
+  timerIv = setInterval(function(){
+    const elapsed   = Date.now() - start
+    const remaining = Math.max(0, totalMs - elapsed)
+    const pct       = (remaining / totalMs) * 100
+    const s         = Math.ceil(remaining / 1000)
+
+    fill.style.width   = pct + '%'
+    num.textContent    = s
+
+    if(s <= 3) {
+      num.classList.add('red')
+      fill.className = 'countdown-fill fill-urgent'
+    }
+
+    if(remaining <= 0) {
+      stopTimer()
+      fill.style.width = '0%'
+      num.textContent  = '0'
+      if(onExpire) onExpire()
+    }
+  }, 100)
+}
+
+function stopTimer() {
+  if(timerIv){ clearInterval(timerIv); timerIv=null; }
+}
+
+// ── UI helpers ────────────────────────────────────────────────
+function hideOverlay() {
+  document.getElementById('qOverlay').classList.remove('visible')
+  phase = 'idle'
+  stopTimer()
+}
+
+function disableOpts() {
+  document.querySelectorAll('.opt').forEach(b=>b.disabled=true)
+}
+
+function highlightCorrect() {
+  document.querySelectorAll('.opt').forEach(b=>{
+    if(b.textContent.charAt(0)===currentQ.correct) b.classList.add('correct')
+  })
+}
+
+function setResult(msg,cls) {
+  const el = document.getElementById('resultMsg')
+  el.textContent = msg
+  el.className = 'result-msg '+(cls||'')
+}
+
+function flashCard(key, cls) {
+  const c = document.getElementById('card-'+key)
+  c.classList.add(cls)
+  setTimeout(()=>c.classList.remove(cls), 480)
+}
+
+function showBonusBadge(key) {
+  const b = document.getElementById('bonus-'+key)
+  if(!b) return
+  b.textContent = '+'+Math.round(battleState[key].storedBonus*100)+'% bonus'
+  b.classList.add('visible')
+}
+
+function hideBonusBadge(key) {
+  const b = document.getElementById('bonus-'+key)
+  if(b) b.classList.remove('visible')
+}
+
+// ── Update displays ───────────────────────────────────────────
+function updateHPDisplay(key) {
+  const p   = battleState[key]
+  const pct = (p.hp / p.maxHP) * 100
+  const f   = document.getElementById('hp-'+key)
+  f.style.width      = pct+'%'
+  f.style.background = pct>50?'#1D9E75':pct>25?'#BA7517':'#E24B4A'
+  document.getElementById('hptext-'+key).textContent = p.hp+' / '+p.maxHP
+}
+
+function updateStreakDisplay(key) {
+  const p = battleState[key]
+  for(let i=0;i<3;i++){
+    const pip = document.getElementById('pip-'+key+'-'+i)
+    pip.classList.remove('on','warn')
+    if(i<p.streak){
+      pip.classList.add(p.streak===2&&i===1?'warn':'on')
+    }
+  }
+  const cb = document.getElementById('crit-'+key)
+  p.critPending ? cb.classList.add('show') : cb.classList.remove('show')
+  const bb = document.getElementById('bonus-'+key)
+  if(p.storedBonus>0){
+    bb.textContent='+'+Math.round(p.storedBonus*100)+'% bonus'
+    bb.classList.add('visible')
+  } else {
+    bb.classList.remove('visible')
+  }
+}
+
+function updateTurnDisplay() {
+  ;['player1','player2'].forEach(k=>{
+    const isActive = battleState.currentTurn===k
+    document.getElementById('card-'+k).classList.toggle('active',isActive)
+    document.getElementById('turn-'+k).classList.toggle('show',isActive)
+  })
+}
+
+// ── Manual switch + reset ─────────────────────────────────────
+function switchTurn() {
+  if(phase!=='idle'){ addLog('Finish the current question first','system'); return }
+  endTurn()
+}
+
+function resetAll() {
+  stopTimer()
+  hideOverlay()
+  phase = 'idle'
+  battleState.currentTurn='player1'
+  ;['player1','player2'].forEach(k=>{
+    battleState[k].hp=200;battleState[k].maxHP=200
+    battleState[k].streak=0;battleState[k].critPending=false
+    battleState[k].storedBonus=0
+    updateHPDisplay(k);updateStreakDisplay(k)
+    hideBonusBadge(k)
+  })
+  updateTurnDisplay()
+  document.getElementById('logBox').innerHTML=
+    '<div class="log-entry system">— Reset — Player 1\'s turn —</div>'
+}
+
+// ── Log ───────────────────────────────────────────────────────
+function addLog(msg,cls){
+  const box=document.getElementById('logBox')
+  const e=document.createElement('div')
+  e.className='log-entry '+(cls||'')
+  e.textContent=msg
+  box.appendChild(e)
+  box.scrollTop=box.scrollHeight
+}
+
+// ── Init ──────────────────────────────────────────────────────
+updateTurnDisplay()
+</script>
+</body>
+</html>

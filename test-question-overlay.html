@@ -334,6 +334,9 @@
     let secondsLeft      = 15
     let overlayPhase     = 'idle'   // 'answer', 'steal', 'done'
     let answeredCorrectly = false
+    // Track these at the start of each turn
+    let activeTurnPlayer  = 'player1'   // the one who picked the move
+    let stealingPlayer    = 'player2'   // the opponent who can steal
 
     // ── Type label config ─────────────────────────────────────
     const TYPE_CONFIG = {
@@ -415,25 +418,31 @@
       })
     }
 
-    // ── Handle an answer click ────────────────────────────────
-    function handleAnswer(selectedLetter, clickedBtn) {
-      // Ignore clicks after already answered
-      if (overlayPhase === 'done') return
+function handleAnswer(selectedLetter, clickedBtn) {
+  if (overlayPhase === 'done') return
 
-      // Stop the timer
-      clearTimer()
+  clearTimer()
+  disableAllButtons()
 
-      // Disable all buttons
-      disableAllButtons()
+  const isCorrect = selectedLetter === currentQuestion.correct
 
-      const isCorrect = selectedLetter === currentQuestion.correct
-
-      if (isCorrect) {
-        onCorrectAnswer(clickedBtn)
-      } else {
-        onWrongAnswer(clickedBtn)
-      }
+  if (overlayPhase === 'answer') {
+    // This is the ACTIVE player answering
+    if (isCorrect) {
+      onCorrectAnswer(clickedBtn)
+    } else {
+      onWrongAnswer(clickedBtn)
     }
+
+  } else if (overlayPhase === 'steal') {
+    // This is the OPPONENT attempting the steal
+    if (isCorrect) {
+      onStealSuccess(clickedBtn)
+    } else {
+      onStealFail(clickedBtn)
+    }
+  }
+}
 
     // ── Correct answer ────────────────────────────────────────
     function onCorrectAnswer(clickedBtn) {
@@ -470,6 +479,39 @@
         startStealPhase()
       }, 1500)
     }
+
+    function onStealSuccess(clickedBtn) {
+  overlayPhase = 'done'
+
+  clickedBtn.classList.add('correct')
+  highlightCorrectAnswer()
+
+  // Store the bonus on the stealing player
+  resolveSteal(stealingPlayer, activeTurnPlayer, true)
+
+  setResult('✓ Steal success! +10% bonus stored.', 'steal')
+
+  setTimeout(() => {
+    hideOverlay()
+    // In the real battle, the turn now passes to the active player
+  }, 1500)
+}
+
+function onStealFail(clickedBtn) {
+  overlayPhase = 'done'
+
+  clickedBtn.classList.add('wrong', 'shake')
+  setTimeout(() => clickedBtn.classList.remove('shake'), 400)
+  highlightCorrectAnswer()
+
+  resolveSteal(stealingPlayer, activeTurnPlayer, false)
+
+  setResult('✗ Steal failed — no damage this turn.', 'timeout')
+
+  setTimeout(() => {
+    hideOverlay()
+  }, 1800)
+}
 
     // ── Timeout ───────────────────────────────────────────────
     function onTimeout() {
