@@ -184,15 +184,25 @@ Optional dual-controller gameplay for an enhanced experience.
 | Week | Phase | Key Deliverable |
 
 | 1 | Foundations | Dev environment, Git repo, static HTML/CSS battle card, JS fundamentals |
+
 | 2 | Foundations | `fetch()` & `async`/`await`, `localStorage`, Flexbox & Grid layouts |
+
 | 3 | Character Creation | File upload UI, Replicate AI sprite pipeline, two-player `localStorage` save |
+
 | 4 | Move Catalogue | `moves.json`, catalogue grid UI, 4-move selection guard |
+
 | 5 | Question Engine | `getQuestion()`, `questions.json` (30+), question overlay UI with timer |
+
 | 6 | Question Mechanics | Streak counter (crit at 3), steal phase (+10% bonus), full question flow |
+
 | 7 | Battle Engine | `calculateDamage()`, turn state machine, full battle screen UI, first playable build |
+
 | 8 | Effects & Sound | CSS animation library, 9+ sound effects, HP colour shifts, feedback visuals |
+
 | 9 | Polish | Entrance cinematics, win/lose screen, 3-min timer + sudden death, balance tuning |
+
 | 10 | Testing & Deploy | Think-aloud user testing (3 testers), Vercel deployment, HCI report draft |
+
 | 11 | Final Submission | Bug sweep, v1.0 GitHub release, complete HCI report, 5-min demo rehearsal |
 
 ---
