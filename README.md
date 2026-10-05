@@ -262,7 +262,8 @@ trivia-arena/
 │   ├── catalogue.html          # Move selection
 │   └── battle.html             # Battle screen
 ├── js/
-│   ├── config.js                # Gitignored — API keys
+│   ├── config.js       # Gitignored — API keys
+│   ├── audioManager.js              
 │   ├── moves.js
 │   ├── questions.js
 │   ├── streak.js
@@ -272,7 +273,7 @@ trivia-arena/
 ├── questions.json
 └── docs/
     ├── Trivia Arena Final Report.pdf
-    ├── Demo Video
+    └── Demo Video
     
 ```
 
