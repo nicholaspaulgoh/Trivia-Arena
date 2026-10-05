@@ -189,7 +189,7 @@ cd trivia-arena
 
 ### Playing
 
-Open `index.html` in a browser. Both players create characters, select a category, choose 4 moves, then battle on the same shared device, passing it between turns.
+Open `index.html` using a live server (eg 'Live Server (Five Server)'  by Yannick) in a browser. Both players create characters, select a category, choose 4 moves, then battle on the same shared device, passing it between turns.
 
 ---
 
@@ -211,8 +211,9 @@ trivia-arena/
 ├── moves.json
 ├── questions.json
 └── docs/
-    ├── HCI_Proposal.pdf
-    └── presentation_slides.pptx
+    ├── Trivia Arena Final Report.pdf
+    ├── Demo Video
+    
 ```
 
 ---
