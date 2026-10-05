@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Question Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a1a2e;
+      color: white;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .question-card {
+      background: #222244;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #534AB7;
+    }
+    .question-text { font-size: 15px; margin-bottom: 12px; line-height: 1.5; }
+    .option {
+      padding: 8px 12px;
+      background: #333;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .option.correct { background: #1D4E3A; border: 1px solid #1D9E75; }
+    .answer { color: #1D9E75; font-size: 13px; margin-top: 8px; }
+    .category { font-size: 11px; color: #888; margin-bottom: 8px; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      padding: 8px 16px;
+      background: #534AB7;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover { background: #6358C8; }
+    #log { font-size: 12px; color: #888; min-height: 18px; }
+  </style>
+</head>
+<body>
+
+  <h2>Question System Test</h2>
+
+  <div class="btn-row">
+    <button onclick="testMove('fire')">🔥 Fire question</button>
+    <button onclick="testMove('water')">💧 Water question</button>
+    <button onclick="testMove('electric')">⚡ Electric question</button>
+    <button onclick="testMove('normal')">👊 Normal question</button>
+  </div>
+
+  <div id="log">Click a button to fetch a question</div>
+  <div id="output"></div>
+
+  <div><button onclick="auditQuestions()">Audit Questions</button></div>
+  <div id="audit"></div>
+
+  <script src="js/questions.js"></script>
+  <script>
+
+    async function testMove(moveType) {
+      const log = document.getElementById('log')
+      const output = document.getElementById('output')
+
+      log.textContent = 'Fetching question for move type: ' + moveType + '...'
+      output.innerHTML = ''
+
+      try {
+        const q = await getQuestion(moveType)
+        log.textContent = 'Loaded! Mode: ' + QUESTION_MODE + ' | Category: ' + q.category
+
+        output.innerHTML = `
+          <div class="question-card">
+            <div class="category">📚 ${q.category} (${moveType} move)</div>
+            <div class="question-text">${q.text}</div>
+            ${q.options.map(opt => `
+              <div class="option ${opt.startsWith(q.correct + ':') ? 'correct' : ''}">
+                ${opt}
+              </div>
+            `).join('')}
+            <div class="answer">✓ Correct answer: ${q.correct}</div>
+          </div>
+        `
+
+        console.log('Full question object:', q)
+
+      } catch (error) {
+        log.textContent = 'Error: ' + error.message
+        console.error(error)
+      }
+    }
+
+    async function auditQuestions(){
+        const response = await fetch('questions.json')
+        const data = await response.json()
+        const questions = data.questions
+
+        const categories = ['science', 'geography', 'technology', 'history']
+        const audit = document.getElementById('audit')
+
+        let html = '<div style="background:#222244;border-radius:8px;padding:16px;margin-top:8px">'
+        html += '<strong>Question bank audit:</strong><br><br>'
+
+        let allGood = true
+
+        categories.forEach(cat => {
+            const count =questions.filter(q => q.category ===cat).length
+        
+
+        const status = count >= 6 ? '✅' : '⚠️'
+        if (count < 6) allGood = false
+
+        html += `${status} ${cat}: ${count} questions<br>`
+    })
+
+        html += `<br><strong>Total: ${questions.length} questions</strong>`
+        html += allGood? '<br><span style="color:#1D9E75">All good — ready to use!</span>'
+         : '<br><span style="color:#E24B4A">Some categories have fewer than 6 questions — add more.</span>'
+
+        html += '</div>'
+
+  audit.innerHTML = html
+    }
+
+  </script>
+</body>
+</html>

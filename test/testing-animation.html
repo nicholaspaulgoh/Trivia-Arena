@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Procedural Pixel Fighter Demo</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: #fff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        canvas {
+            background: #2c3e50;
+            border: 4px solid #34495e;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            image-rendering: pixelated; /* Keeps pixel art crisp */
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+        button:hover { background: #c0392b; }
+        #fireballBtn { background: #f39c12; }
+        #fireballBtn:hover { background: #d35400; }
+    </style>
+</head>
+<body>
+
+    <h2>Procedural Pixel Fighter</h2>
+    <canvas id="gameCanvas" width="512" height="256"></canvas>
+    
+    <div class="controls">
+        <button id="punchBtn">PUNCH</button>
+        <button id="fireballBtn">FIREBALL</button>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Load your static image (Proxied link to avoid CORS blockages)
+const fighterImg = new Image();
+fighterImg.src = 'data:image/png;base64,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'
+
+// State management
+let state = 'idle'; // 'idle', 'punch', 'fireball'
+let animationTimer = 0;
+
+// Fireball particle state
+let fireballs = [];
+
+// Stance modifiers (changed via code loop)
+let bounceY = 0;
+let stretchX = 1;
+let stretchY = 1;
+let rotation = 0;
+let offsetX = 0;
+
+// Event listeners for triggers
+document.getElementById('punchBtn').addEventListener('click', () => {
+    if (state === 'idle') {
+        state = 'punch';
+        animationTimer = 0;
+    }
+});
+
+document.getElementById('fireballBtn').addEventListener('click', () => {
+    if (state === 'idle') {
+        state = 'fireball';
+        animationTimer = 0;
+    }
+});
+
+// Primary Game/Render loop
+function update(time) {
+    // Clear screen
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw simple background floor line
+    ctx.strokeStyle = '#7f8c8d';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(0, 210);
+    ctx.lineTo(canvas.width, 210);
+    ctx.stroke();
+
+    animationTimer++;
+
+    // --- PROCEDURAL ENGINE STATE MACHINE ---
+    if (state === 'idle') {
+        // Continuous organic breathing rhythm using a sine wave
+        bounceY = Math.sin(time * 0.007) * 4; 
+        stretchX = 1 + Math.sin(time * 0.007) * 0.02;
+        stretchY = 1 - Math.sin(time * 0.007) * 0.02;
+        rotation = 0;
+        offsetX = 0;
+
+    } else if (state === 'punch') {
+        // Sudden forward spring frame calculations
+        if (animationTimer < 5) {
+            // Wind up backward slightly
+            offsetX = -10;
+            stretchX = 0.95;
+        } else if (animationTimer >= 5 && animationTimer  >=20) {
+            state = 'idle';
+        }
+    }
+
+    // --- DRAW CHARACTERS WITH DEFORMATIONS ---
+    if (fighterImg.complete) {
+        ctx.save();
+        
+        // Base positioning coordinates
+        const baseImgWidth = 128;
+        const baseImgHeight = 128;
+        const xPos = 80 + offsetX;
+        const yPos = 80 + bounceY;
+
+        // Shift origin coordinates directly to character feet to rotate and scale correctly
+        ctx.translate(xPos + baseImgWidth / 2, yPos + baseImgHeight);
+        ctx.rotate(rotation);
+        ctx.scale(stretchX, stretchY);
+        
+        // Draw the image onto the transformed space
+        ctx.drawImage(fighterImg, -baseImgWidth / 2, -baseImgHeight, baseImgWidth, baseImgHeight);
+        
+        ctx.restore();
+    } else {
+        // Loading placeholder if image buffer takes a millisecond to pull
+        ctx.fillStyle = '#fff';
+        ctx.fillText("Generating Assets...", 80, 140);
+    }
+
+    // --- RENDER SEPARATE FIREBALL ENTITIES ---
+    updateAndRenderFireballs();
+
+    requestAnimationFrame(update);
+}
+
+// Function to generate the independent fireball visual effect
+function spawnFireball(startX, startY) {
+    fireballs.push({
+        x: startX,
+        y: startY,
+        speed: 8,
+        size: 16,
+        pulse: 0
+    });
+}
+
+function updateAndRenderFireballs() {
+    for (let i = fireballs.length - 1; i >= 0; i--) {
+        let f = fireballs[i];
+        f.x += f.speed;
+        f.pulse += 0.5;
+
+        // Draw a multi-layered pixelated aura directly via code blocks
+        let dynamicSize = f.size + Math.sin(f.pulse) * 4;
+
+        // Outer Yellow Core
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(f.x - 4, f.y - dynamicSize/2, dynamicSize + 8, dynamicSize);
+        
+        // Inner Orange Glow Core
+        ctx.fillStyle = '#e67e22';
+        ctx.fillRect(f.x, f.y - (dynamicSize-6)/2, dynamicSize, dynamicSize - 6);
+
+        // White hot center point
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(f.x + 6, f.y - 4, 8, 8);
+
+        // Delete when exiting screen boundaries
+        if (f.x > canvas.width) {
+            fireballs.splice(i, 1);
+        }
+    }
+}
+
+// Start processing loop
+requestAnimationFrame(update);
+</script>
+
+</body>
+</html>

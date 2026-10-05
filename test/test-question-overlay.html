@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Question Overlay Test</title>
+  <style>
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a1a2e;
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      gap: 16px;
+    }
+
+    /* ── Fake battle screen behind the overlay ── */
+    .fake-battle {
+      width: 100%;
+      max-width: 640px;
+      height: 200px;
+      background: #16213e;
+      border: 2px solid #534AB7;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #444;
+      font-size: 14px;
+      position: relative;
+    }
+
+    /* ── QUESTION OVERLAY ────────────────────── */
+    .question-overlay {
+      width: 100%;
+      max-width: 640px;
+
+      /* Hidden by default */
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+
+      background: #0e0e2a;
+      border: 2px solid #534AB7;
+      border-radius: 16px;
+      padding: 20px;
+
+      /* Slide up animation when shown */
+      animation: slideUp 0.25s ease-out;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    /* Show class — JS adds/removes this */
+    .question-overlay.visible {
+      display: flex;
+    }
+
+    /* ── Overlay header ── */
+    .overlay-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .move-type-label {
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    .label-fire     { background:#E85D2433; color:#E85D24; border:1px solid #E85D24; }
+    .label-water    { background:#185FA533; color:#4488ff; border:1px solid #4488ff; }
+    .label-electric { background:#BA751733; color:#FFD700; border:1px solid #FFD700; }
+    .label-normal   { background:#55557033; color:#aaa;    border:1px solid #555570; }
+    .label-steal    { background:#BA751733; color:#FFD700; border:1px solid #FFD700; }
+
+    .timer-number {
+      font-size: 22px;
+      font-weight: bold;
+      min-width: 32px;
+      text-align: right;
+      transition: color 0.3s;
+    }
+
+    .timer-number.urgent { color: #E24B4A; }
+
+    /* ── Countdown bar ── */
+    .countdown-track {
+      width: 100%;
+      height: 8px;
+      background: #222;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .countdown-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: background 0.3s;
+
+      /* The width shrinks via JS — transition makes it smooth */
+      /* We do NOT use CSS transition on width because JS controls it */
+    }
+
+    .countdown-fill.phase-answer { background: #1D9E75; }
+    .countdown-fill.phase-steal  { background: #BA7517; }
+    .countdown-fill.phase-urgent { background: #E24B4A; }
+
+    /* ── Phase label (Answer / Steal) ── */
+    .phase-label {
+      font-size: 12px;
+      color: #888;
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    .phase-label.steal-phase {
+      color: #FFD700;
+      font-weight: bold;
+    }
+
+    /* ── Question text ── */
+    .question-text {
+      font-size: 16px;
+      line-height: 1.6;
+      color: white;
+      text-align: center;
+      padding: 4px 0;
+    }
+
+    /* ── Answer buttons ── */
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .option-btn {
+      padding: 12px 10px;
+      background: #1a1a3a;
+      border: 2px solid #333;
+      border-radius: 10px;
+      color: white;
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      line-height: 1.4;
+    }
+
+    .option-btn:hover:not(:disabled) {
+      background: #222255;
+      border-color: #534AB7;
+    }
+
+    .option-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .option-btn:disabled {
+      cursor: not-allowed;
+    }
+
+    /* Answer result states */
+    .option-btn.correct {
+      background: #0d3d28;
+      border-color: #1D9E75;
+      color: #1D9E75;
+      animation: correctPulse 0.3s ease-out;
+    }
+
+    .option-btn.wrong {
+      background: #3d0d0d;
+      border-color: #E24B4A;
+      color: #E24B4A;
+    }
+
+    /* Shake animation for wrong answer */
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%     { transform: translateX(-8px); }
+      40%     { transform: translateX(8px); }
+      60%     { transform: translateX(-6px); }
+      80%     { transform: translateX(6px); }
+    }
+
+    .option-btn.shake {
+      animation: shake 0.35s ease-out;
+    }
+
+    /* Pulse animation for correct answer */
+    @keyframes correctPulse {
+      0%,100% { transform: scale(1); }
+      50%     { transform: scale(1.04); }
+    }
+
+
+
+    /* ── Result message ── */
+    .result-msg {
+      text-align: center;
+      font-size: 14px;
+      font-weight: bold;
+      min-height: 20px;
+      transition: color 0.2s;
+    }
+
+    .result-msg.correct { color: #1D9E75; }
+    .result-msg.wrong   { color: #E24B4A; }
+    .result-msg.steal   { color: #FFD700; }
+    .result-msg.timeout { color: #888; }
+
+    /* ── Test controls ── */
+    .test-controls {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .test-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      transition: opacity 0.15s;
+    }
+    .test-btn:hover { opacity: 0.85; }
+    .fire-btn     { background: #E85D24; color: white; }
+    .water-btn    { background: #185FA5; color: white; }
+    .electric-btn { background: #BA7517; color: white; }
+    .normal-btn   { background: #555570; color: white; }
+    .reset-btn    { background: #333; color: #aaa; }
+
+    .test-log {
+      font-size: 12px;
+      color: #555;
+      text-align: center;
+      min-height: 16px;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Temp battle screen (in real game this is behind the overlay) -->
+  <div class="fake-battle">
+    Battle screen sits here — overlay appears on top
+  </div>
+
+  <!-- ── QUESTION OVERLAY ── -->
+  <div class="question-overlay" id="questionOverlay">
+
+    <!-- Header: move type label + timer number -->
+    <div class="overlay-header">
+      <span class="move-type-label label-fire" id="moveTypeLabel">
+        🔥 FIRE QUESTION
+      </span>
+      <span class="timer-number" id="timerNumber">15</span>
+    </div>
+
+    <!-- Countdown bar -->
+    <div class="countdown-track">
+      <div class="countdown-fill phase-answer" id="countdownFill"
+        style="width:100%">
+      </div>
+    </div>
+
+    <!-- Phase label -->
+    <div class="phase-label" id="phaseLabel">
+      Answer within 15 seconds
+    </div>
+
+    <!-- Question text -->
+    <div class="question-text" id="questionText">
+      Loading question...
+    </div>
+
+    <!-- Answer options -->
+    <div class="options-grid" id="optionsGrid"></div>
+
+    <!-- Result message -->
+    <div class="result-msg" id="resultMsg"></div>
+
+  </div>
+
+  <!-- Test controls -->
+  <div class="test-controls">
+    <button class="test-btn fire-btn"     onclick="testQuestion('fire')">
+      🔥 Fire question
+    </button>
+    <button class="test-btn water-btn"    onclick="testQuestion('water')">
+      💧 Water question
+    </button>
+    <button class="test-btn electric-btn" onclick="testQuestion('electric')">
+      ⚡ Electric question
+    </button>
+    <button class="test-btn normal-btn"   onclick="testQuestion('normal')">
+      👊 Normal question
+    </button>
+    <button class="test-btn reset-btn"    onclick="resetOverlay()">
+      ↺ Reset
+    </button>
+  </div>
+
+  <div class="test-log" id="testLog">
+    Click a button to test the question overlay
+  </div>
+
+  <script src="js/questions.js"></script>
+  <script>
+
+    // ── State ─────────────────────────────────────────────────
+    let currentQuestion  = null
+    let timerInterval    = null
+    let secondsLeft      = 15
+    let overlayPhase     = 'idle'   // 'answer', 'steal', 'done'
+    let answeredCorrectly = false
+    // Track these at the start of each turn
+    let activeTurnPlayer  = 'player1'   // the one who picked the move
+    let stealingPlayer    = 'player2'   // the opponent who can steal
+
+    // ── Type label config ─────────────────────────────────────
+    const TYPE_CONFIG = {
+      fire:     { emoji: '🔥', label: 'FIRE QUESTION',     cls: 'label-fire'     },
+      water:    { emoji: '💧', label: 'WATER QUESTION',    cls: 'label-water'    },
+      electric: { emoji: '⚡', label: 'ELECTRIC QUESTION', cls: 'label-electric' },
+      normal:   { emoji: '👊', label: 'NORMAL QUESTION',   cls: 'label-normal'   },
+    }
+
+    // ── Show the overlay with a question ─────────────────────
+    async function testQuestion(moveType) {
+      setTestLog('Loading question for ' + moveType + ' move...')
+
+      // Load a question
+      try {
+        currentQuestion = await getQuestion(moveType)
+      } catch (e) {
+        setTestLog('Error loading question: ' + e.message)
+        return
+      }
+
+      showOverlay(currentQuestion, moveType)
+    }
+
+    // ── Core function — show the overlay ─────────────────────
+    function showOverlay(question, moveType) {
+      const overlay = document.getElementById('questionOverlay')
+
+      // Reset everything first
+      clearTimer()
+      resetOptionStyles()
+      setResult('', '')
+
+      // Set the move type label
+      const config = TYPE_CONFIG[moveType]
+      const typeLabel = document.getElementById('moveTypeLabel')
+      typeLabel.textContent = config.emoji + ' ' + config.label
+      typeLabel.className   = 'move-type-label ' + config.cls
+
+      // Set the question text
+      document.getElementById('questionText').textContent = question.text
+
+      // Render the 4 answer buttons
+      renderOptions(question.options)
+
+      // Set phase label
+      document.getElementById('phaseLabel').textContent =
+        'Answer within 15 seconds'
+      document.getElementById('phaseLabel').className = 'phase-label'
+
+      // Show the overlay
+      overlay.classList.add('visible')
+      overlayPhase = 'answer'
+
+      // Start the 15-second countdown
+      startCountdown(15, 'answer', function() {
+        // Timer ran out — treat as wrong answer
+        onTimeout()
+      })
+
+      setTestLog('Question loaded! Category: ' + question.category)
+    }
+
+    // ── Render option buttons ─────────────────────────────────
+    function renderOptions(options) {
+      const grid = document.getElementById('optionsGrid')
+      grid.innerHTML = ''
+
+      options.forEach((optionText) => {
+        const btn = document.createElement('button')
+        btn.className   = 'option-btn'
+        btn.textContent = optionText
+
+        // Extract just the letter (first character)
+        const letter = optionText.charAt(0)
+
+        btn.onclick = () => handleAnswer(letter, btn)
+        grid.appendChild(btn)
+      })
+    }
+
+function handleAnswer(selectedLetter, clickedBtn) {
+  if (overlayPhase === 'done') return
+
+  clearTimer()
+  disableAllButtons()
+
+  const isCorrect = selectedLetter === currentQuestion.correct
+
+  if (overlayPhase === 'answer') {
+    // This is the ACTIVE player answering
+    if (isCorrect) {
+      onCorrectAnswer(clickedBtn)
+    } else {
+      onWrongAnswer(clickedBtn)
+    }
+
+  } else if (overlayPhase === 'steal') {
+    // This is the OPPONENT attempting the steal
+    if (isCorrect) {
+      onStealSuccess(clickedBtn)
+    } else {
+      onStealFail(clickedBtn)
+    }
+  }
+}
+
+    // ── Correct answer ────────────────────────────────────────
+    function onCorrectAnswer(clickedBtn) {
+      overlayPhase = 'done'
+
+      // Style the button green
+      clickedBtn.classList.add('correct')
+
+      // Show result message
+      setResult('✓ Correct! Full damage dealt.', 'correct')
+      setTestLog('CORRECT — full damage!')
+
+      // Hide overlay after 1.5 seconds
+      setTimeout(() => {
+        hideOverlay()
+        setTestLog('Turn complete. Full damage was dealt.')
+      }, 1500)
+    }
+
+    // ── Wrong answer ──────────────────────────────────────────
+    function onWrongAnswer(clickedBtn) {
+      // Shake the wrong button
+      clickedBtn.classList.add('wrong', 'shake')
+      setTimeout(() => clickedBtn.classList.remove('shake'), 400)
+
+      // Highlight the correct answer in green
+      highlightCorrectAnswer()
+
+      setResult('✗ Wrong answer!', 'wrong')
+      setTestLog('WRONG — steal phase starting in 1.5s...')
+
+      // Transition to steal phase after 1.5s
+      setTimeout(() => {
+        startStealPhase()
+      }, 1500)
+    }
+
+    function onStealSuccess(clickedBtn) {
+  overlayPhase = 'done'
+
+  clickedBtn.classList.add('correct')
+  highlightCorrectAnswer()
+
+  // Store the bonus on the stealing player
+  resolveSteal(stealingPlayer, activeTurnPlayer, true)
+
+  setResult('✓ Steal success! +10% bonus stored.', 'steal')
+
+  setTimeout(() => {
+    hideOverlay()
+    // In the real battle, the turn now passes to the active player
+  }, 1500)
+}
+
+function onStealFail(clickedBtn) {
+  overlayPhase = 'done'
+
+  clickedBtn.classList.add('wrong', 'shake')
+  setTimeout(() => clickedBtn.classList.remove('shake'), 400)
+  highlightCorrectAnswer()
+
+  resolveSteal(stealingPlayer, activeTurnPlayer, false)
+
+  setResult('✗ Steal failed — no damage this turn.', 'timeout')
+
+  setTimeout(() => {
+    hideOverlay()
+  }, 1800)
+}
+
+    // ── Timeout ───────────────────────────────────────────────
+    function onTimeout() {
+      disableAllButtons()
+      highlightCorrectAnswer()
+      setResult('⏱ Time\'s up!', 'timeout')
+      setTestLog('TIMEOUT — steal phase starting in 1.5s...')
+
+      setTimeout(() => {
+        startStealPhase()
+      }, 1500)
+    }
+
+    // ── Steal phase ───────────────────────────────────────────
+    function startStealPhase() {
+      overlayPhase = 'steal'
+
+      // Re-enable buttons for the opponent
+      resetOptionStyles()
+      renderOptions(currentQuestion.options)
+
+      // Update header to steal phase styling
+      const typeLabel = document.getElementById('moveTypeLabel')
+      typeLabel.textContent = '🎯 STEAL OPPORTUNITY!'
+      typeLabel.className   = 'move-type-label label-steal'
+
+      // Update phase label
+      const phaseLabel = document.getElementById('phaseLabel')
+      phaseLabel.textContent = 'Opponent has 5 seconds to steal!'
+      phaseLabel.className   = 'phase-label steal-phase'
+
+      // Update countdown fill colour
+      document.getElementById('countdownFill').className =
+        'countdown-fill phase-steal'
+
+      setResult('', '')
+
+      // Start 5-second steal timer
+      startCountdown(5, 'steal', function() {
+        onStealTimeout()
+      })
+
+      setTestLog('STEAL PHASE — opponent has 5 seconds!')
+    }
+
+    // ── Steal timeout — both failed ───────────────────────────
+    function onStealTimeout() {
+      disableAllButtons()
+      highlightCorrectAnswer()
+      setResult('Both failed — no damage this turn.', 'timeout')
+      setTestLog('Both failed — no damage. Turn passes.')
+
+      setTimeout(() => {
+        hideOverlay()
+        setTestLog('Turn complete. No damage dealt.')
+      }, 1800)
+    }
+
+    // ── Highlight the correct answer ──────────────────────────
+    function highlightCorrectAnswer() {
+      const buttons = document.querySelectorAll('.option-btn')
+      buttons.forEach(btn => {
+        const letter = btn.textContent.charAt(0)
+        if (letter === currentQuestion.correct) {
+          btn.classList.add('correct')
+        }
+      })
+    }
+
+    // ── Timer system ──────────────────────────────────────────
+    function startCountdown(seconds, phase, onExpire) {
+      secondsLeft = seconds
+
+      const fill   = document.getElementById('countdownFill')
+      const number = document.getElementById('timerNumber')
+
+      // Set initial state
+      fill.style.width  = '100%'
+      number.textContent = seconds
+      number.classList.remove('urgent')
+
+      // Tick every 100ms for smooth bar, but only update number each second
+      const totalMs    = seconds * 1000
+      const startTime  = Date.now()
+
+      timerInterval = setInterval(function() {
+        const elapsed  = Date.now() - startTime
+        const remaining = Math.max(0, totalMs - elapsed)
+        const pct      = (remaining / totalMs) * 100
+        const secs     = Math.ceil(remaining / 1000)
+
+        // Update bar width
+        fill.style.width = pct + '%'
+
+        // Update number
+        number.textContent = secs
+
+        // Turn red when 3 or fewer seconds left
+        if (secs <= 3) {
+          number.classList.add('urgent')
+          if (phase === 'answer') {
+            fill.className = 'countdown-fill phase-urgent'
+          }
+        }
+
+        // Timer expired
+        if (remaining <= 0) {
+          clearTimer()
+          fill.style.width = '0%'
+          number.textContent = '0'
+          if (onExpire) onExpire()
+        }
+
+      }, 100)  // update every 100ms for smooth animation
+    }
+
+    function clearTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval)
+        timerInterval = null
+      }
+    }
+
+    // ── Show / hide overlay ───────────────────────────────────
+    function hideOverlay() {
+      document.getElementById('questionOverlay').classList.remove('visible')
+      overlayPhase = 'idle'
+      clearTimer()
+    }
+
+    function resetOverlay() {
+      hideOverlay()
+      resetOptionStyles()
+      setResult('', '')
+      setTestLog('Reset — ready for next question')
+    }
+
+    // ── Helper: disable all answer buttons ───────────────────
+    function disableAllButtons() {
+      document.querySelectorAll('.option-btn').forEach(btn => {
+        btn.disabled = true
+      })
+    }
+
+    // ── Helper: reset option button styles ───────────────────
+    function resetOptionStyles() {
+      document.querySelectorAll('.option-btn').forEach(btn => {
+        btn.classList.remove('correct', 'wrong', 'shake')
+        btn.disabled = false
+      })
+    }
+
+    // ── Helper: set result message ────────────────────────────
+    function setResult(message, type) {
+      const el = document.getElementById('resultMsg')
+      el.textContent = message
+      el.className   = 'result-msg ' + type
+    }
+
+    // ── Helper: test log ──────────────────────────────────────
+    function setTestLog(message) {
+      document.getElementById('testLog').textContent = message
+    }
+
+  </script>
+</body>
+</html>
