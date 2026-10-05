@@ -258,6 +258,8 @@ Open `index.html` using a live server (eg 'Live Server (Five Server)'  by Yannic
 ```
 trivia-arena/
 ├── assets                      # Game images, sprites, backgrounds, and other visual resources
+├── docs/
+|   ├── Trivia Arena Final Report.pdf
 ├── js/
 │   ├── config.js               # Gitignored — API keys
 │   ├── audioManager.js              
@@ -269,7 +271,6 @@ trivia-arena/
 ├── pages/
 │   ├── catalogue.html          # Move selection
 │   └── battle.html             # Battle screen
-|── Trivia Arena Final Report.pdf
 ├── index.html                  # Character creation (Player 1 and Player 2)
 ├── moves.json
 ├── questions.json
