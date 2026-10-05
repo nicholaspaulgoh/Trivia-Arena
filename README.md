@@ -271,9 +271,7 @@ trivia-arena/
 │   └── battle.js
 ├── moves.json
 ├── questions.json
-└── docs/
-    ├── Trivia Arena Final Report.pdf
-    └── Demo Video
+└── Trivia Arena Final Report.pdf
     
 ```
 
